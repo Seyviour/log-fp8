@@ -213,6 +213,9 @@ def sim_fp_add(f1:FP8, f2:FP8):
 
     result_exp = exp1 if (exp_diff >= 0) else exp2
 
+    mant1 = mant1 >> abs(exp_diff) if (exp_diff < 0) else mant1
+    mant2 = mant2 if (exp_diff < 0) else mant2 >> exp_diff
+
     if (exp_diff < 0): # check bit 4 of exp
         # result_exp = exp2
         mant1 = mant1 >> abs(exp_diff)
