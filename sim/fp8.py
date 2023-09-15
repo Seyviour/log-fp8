@@ -233,6 +233,18 @@ class FP8:
     @staticmethod  
     def fp8_add(f1, f2):
 
+        """
+            Arguments:
+                f1: FP8
+                f2: FP8
+            
+            Returns:
+                sum: FP8
+        """
+
+        #This method is currently broken hence the stub on the next line
+        return FP8(f1.get_float() + f2.get_float())
+
         sign1, exp1, mant1 = f1.filter_sign(), f1.filter_exp(), f1.filter_mantissa()
         sign2, exp2, mant2 = f2.filter_sign(), f2.filter_exp(), f2.filter_mantissa()
 
@@ -394,66 +406,3 @@ if __name__ == "__main__":
                         {prod.get_float():+015.10f} \t \
                         {error:+015.10f}\n")
         f.write(f"{cumulative_error} \t {error_count}")
-
-
-
-
-
-
-        
-
-    # with open
-    # a = FP8(2)
-    # b = FP8(100)
-
-    # print(sim_fp_add(a, b))
-
-    # with open("logarithms.txt", "w") as f, open("antilogarithms.txt", "w") as g:
-    #     f.write("Values \t \t || \t \t Logarithms\n")
-
-    #     g.write("Values \t \t || \t \t Anti-logarithms\n")
-    #     vals = [FP8(x) for x in range(256)]
-    #     logs = [FP8(x.log2()) for x in vals]
-    #     anti_logs = [FP8(x.exp2()) for x in vals]
-
-    #     for (val, log) in zip(vals, logs):
-    #         f.write(f"{val.__repr__()} \t \t || \t \t {log.__repr__()}\n")
-        
-    #     for (val, log) in zip(vals, anti_logs):
-    #         g.write(f"{val.__repr__()} \t \t || \t \t {log.__repr__()}\n")
-
-
-    # with open("anti_log_data", "w") as f, open("friendly_antilogs", "w") as g:
-    #     f.write("Value \t\t exp_float \t\t mant_float \t\t Anti-log \t\t antilog-exp_float \t\t True mants\n")
-    #     vals = [FP8(x) for x in range(256)]
-
-    #     anti_logs = [FP8(x.exp2() + 0.0) for x in vals]
-
-    #     exp_floats = [FP8(float(x.get_exp())) for x in anti_logs]
-
-    #     mant_floats = [FP8(float(x.get_mantissa())) for x in anti_logs]
-
-    #     subs = [FP8(val.get_float() - exp.get_float()) for (val, exp) in zip(vals, exp_floats)]
-
-    #     true_mants = [FP8(x.exp2()+0.0) for x in subs]
-
-    #     unique_subs = list(set([x.get_float() for x in subs]))
-    #     unique_subs.sort()
-    #     unique_subs = [FP8(x) for x in unique_subs]
-    #     unique_true_mants = [FP8(x.exp2()) for x in unique_subs]
-
-    #     # print(len(set(unique)))
-
-    #     for (val, ef, mf, al, sub, trm) in zip (vals, exp_floats, mant_floats, anti_logs, subs, true_mants):
-            
-    #         f.write("{:+015.10f} \t {:+015.10f} \t {:+015.10f} \t {:+015.10f} \t {:+015.10f} \t {:+015.10f} \n".format(val.get_float(), ef.get_float(), mf.get_float(),al.get_float(), sub.get_float(), trm.get_float()))
-
-    #     for (us, utm) in zip(unique_subs, unique_true_mants): 
-    #         g.write("{:+015.10f} \t {:08b} \t {:+015.10f} \t {:08b}\n".format(us.get_float(), us._int_val, utm.get_float(), utm._int_val))
-
-
-
-
-
-
-
