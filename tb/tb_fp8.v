@@ -4,7 +4,7 @@ module adderFP8_tb;
 int fd; 
 
 initial begin
-    fd = $fopen("./result.txt", "w");
+    fd = $fopen("tb/result.txt", "w");
 
     if (fd) 
         $display("`results.txt` opened for writing"); 

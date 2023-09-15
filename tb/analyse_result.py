@@ -3,7 +3,7 @@ from fp8 import FP8
 # print(FP8(449.0))
 count = 0
 cum_error = 0
-with open("result.txt", "r") as f, open("failing.txt", "w") as f2:
+with open("tb/result.txt", "r") as f, open("tb/failing.txt", "w") as f2:
     print ("Reading results from 'result.txt' \nFailing cases will be written to 'failing.txt' \n")
 
     for line in f:
