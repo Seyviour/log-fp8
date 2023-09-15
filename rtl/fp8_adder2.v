@@ -1,7 +1,7 @@
 module adderFP8 #(parameter FP8_TYPE = 1)(
     input wire [7:0] A,
     input wire [7:0] B,
-    input wire clk, 
+    input wire clk,
     output reg [7:0] C
 );
 
@@ -29,16 +29,18 @@ assign mantB = {redOrExpB, _mantB};
 */
 
 reg sign_diff;
-reg [3:0] _exp_diff, exp_diff;
+reg [3:0]  exp_diff;
 
-reg [7:0] mant1, mant2, mant2S;
+reg [7:0] mant1, mant2;
+reg [8:0] mant2S;
+reg deg_check; 
 reg [8:0] _mant_sum, mant_sum; 
 reg [3:0] exp1;
 
-reg [4:0] exp_sum; 
+reg [3:0] exp_sum; 
 
 reg is_roundable;
-reg is_degen;
+// reg is_degen;
 
 reg [3:0] expAReg, expBReg; 
 
@@ -55,15 +57,15 @@ always @(*) begin
     gt = {expA, mantA} >= {expB, mantB};
     expSubArg1 = gt? expAReg: expBReg;
     expSubArg2 = gt? expBReg: expAReg;
-    _exp_diff = expSubArg1 - expSubArg2;
+    exp_diff = expSubArg1 - expSubArg2;
     
     mant1[7:4] = gt? mantA: mantB;
     mant2[7:4] = gt? mantB: mantA;
     result_sign = gt? signA: signB;
     exp1 = gt? expAReg: expBReg;
     // exp_diff_gt_4 = _exp_diff > 4;
-    exp_diff = _exp_diff;//(exp_diff_gt_4)? _exp_diff: _exp_diff;
-    mant2S = mant2 >> exp_diff; 
+    
+    {mant2S, deg_check} = {mant2, 1'b0} >> exp_diff; 
 end
 /* 
 {8765} is rounded when bit 4 is set
@@ -83,16 +85,11 @@ in both cases, adding 1 to bit 2 accomplishes rounding
 //         x  
 reg [1:0] round; 
 always @(*) begin
-    is_degen = ((mant1[7:4] == 4'b1000) && (mant2S[6:3]==4'b1111)); 
-    if (sign_diff) begin
-        _mant_sum = mant1 - mant2S;
-    end else begin
-        _mant_sum = mant1 + mant2S;
-    end
-    is_roundable = !(((mant2[7:4]==4'd9) && (exp_diff==4'd5)) && sign_diff); 
-    round[1] = (_mant_sum[8] & _mant_sum[4]) || (!_mant_sum[8] & _mant_sum[7] & _mant_sum[3]);//& is_roundable;
-    round[0] = is_roundable && !round[1] && ((_mant_sum[6] & _mant_sum[2]) || (!_mant_sum[6] && _mant_sum[5] && _mant_sum[1])); 
-    mant_sum = _mant_sum + {round[1], 1'b0, round[0], 2'b0}; 
+    _mant_sum = mant1 + (sign_diff? (-(mant2S|deg_check)): mant2S); 
+    // is_roundable = !({mant2S[1:0], deg_check} == 3'b001); 
+    round[1] = (_mant_sum[8] & _mant_sum[4]) || (_mant_sum[7] & _mant_sum[3]);
+    round[0] =  !round[1] && ((_mant_sum[6] & _mant_sum[2]) || ( (_mant_sum[5]) && _mant_sum[1])); 
+    mant_sum = {_mant_sum[8:2] + {round[1], 1'b0, round[0]}, _mant_sum[1:0]}; 
 
 end
 
@@ -103,48 +100,41 @@ reg left_shift;
 
 always @(*) begin
     left_shift = !(mant_sum[8] || mant_sum[7]);
-    exp_neg[1] = !(mant_sum[8] || mant_sum[7] || mant_sum[6]) && (mant_sum[5] || mant_sum[4]);
-    exp_neg[0] = !(mant_sum[8] || mant_sum[7]) && (!mant_sum[5] && mant_sum[4] || mant_sum[6]);
+    exp_neg[1] = (left_shift && !mant_sum[6]) && (mant_sum[5] || mant_sum[4]);
+    exp_neg[0] = left_shift && (!mant_sum[5] && mant_sum[4] || mant_sum[6]);
 end
 
-// reg [2:0] final_mant;
-// reg overflow, underflow;
+
 reg [3:0] final_exp;
 
-reg [2:0] true_shift;
+reg [3:0] true_shift_or_exp;
 reg [4:0] exp_sum_arg;
-reg over_under_flow; 
-always @(*) begin
-    // overflow = 1'b0;
-    // underflow = 1'b0;
-    sh_req = {is_degen&&left_shift, exp_neg}; 
-    exp_sum_arg = ({2'b00, sh_req} ^ {5{left_shift}}) | mant_sum[8]; 
-    exp_sum = exp1 + exp_sum_arg;
-    over_under_flow = exp_sum[4] ;//|| (left_shift && (!(|exp_sum[3:1])));
-    true_shift = over_under_flow? sh_req + exp_sum: sh_req;
+reg over_under_flow;
 
-    
+
+always @(*) begin
+    sh_req = {mant_sum==5'b1000, exp_neg}; 
+    exp_sum_arg = ({2'b00, sh_req} ^ {5{left_shift}}) | mant_sum[8]; 
+    {over_under_flow, exp_sum} = exp1 + exp_sum_arg;
+    true_shift_or_exp = exp_sum + (({4{over_under_flow}} & sh_req) | (!over_under_flow));
 end
 
-
-
 reg[3:0] final_mant;
-reg[7:0] shifted_mant; 
-always @(*) begin
-    // shifted_mant = mant_sum; 
-    // final_mant = mant_sum[7:4];
-    shifted_mant = mant_sum << true_shift;
+reg[8:0] shifted_mant;
 
-    // final_mant = shifted_mant[7:4]; 
-    if (mant_sum[8]) 
-        final_mant = over_under_flow?4'b1111: mant_sum[8:5]; 
-    else// if(!mant_sum[7])
+
+always @(*) begin
+    shifted_mant = mant_sum << (over_under_flow? true_shift_or_exp: sh_req);
+
+    if (shifted_mant[8]) 
+        final_mant = mant_sum[8:5] | {4{over_under_flow}}; 
+    else
         final_mant = shifted_mant[7:4];
 
     if (left_shift) begin
-        final_exp = (exp1 - true_shift) & {4{final_mant[3]}};
+        final_exp = {4{!over_under_flow}} & true_shift_or_exp;
     end else begin
-        final_exp = over_under_flow? 4'b1111: exp_sum[3:0];
+        final_exp = {4{over_under_flow}} | exp_sum[3:0];
     end
     
 end
