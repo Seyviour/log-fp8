@@ -1,0 +1,136 @@
+`default_nettype none
+module adderFP8 #(
+    parameter FP8_TYPE = 0
+) (
+    input wire clk, 
+    input wire [7:0] A, B,
+    output reg [7:0] C
+);
+
+/*
+    THIS MODULE IS BROKEN
+    THIS MODULE IS BROKEN
+    THIS MODULE IS BROKEN
+
+
+*/
+
+reg sign1, sign2;
+reg [3:0] expA, expB, exp1, exp2, exp1_reg, exp2_reg;
+reg [3:0] expA_reg, expB_reg;
+reg [2:0] mant1, mant2;
+reg [3:0] exp_diff;
+reg sd; //sign_difference; 
+reg gt, gt1, gt2;
+reg result_sign; 
+
+
+reg [3:0] mant1_ext, mant2_ext, mantA_ext, mantB_ext;
+reg part_red_or_expA, part_red_or_expB; 
+
+// Subnormals are really something, lol.
+// If it's possible to do without them, I absolutely will
+// Saw a paper that mentioned that they don't really affect training
+// if that checks out, I'll be the first to stamp them out!
+// This is a Wendy's ma'am, not a math classroom
+always @(*) begin 
+    part_red_or_expA = |(A[6:4]);
+    part_red_or_expB = |(B[6:4]); 
+
+    mantA_ext = {part_red_or_expA|A[3], A[2:0]};
+    mantB_ext = {part_red_or_expB|B[3], B[2:0]};
+
+    expA_reg = A[6:3] | !part_red_or_expA; 
+    expB_reg = B[6:3] | !part_red_or_expB; 
+end
+
+always @(*) begin
+    gt1 = expA_reg >= expB_reg;
+    gt2 = mantA_ext > mantB_ext;
+    gt = A[6:0] > B[7:0]; 
+    sd = (A[7] ^ B[7]); 
+end
+ 
+
+always @(*) begin
+    result_sign = (gt & A[7]) | (!gt & B[7]); 
+    {exp1_reg, exp2_reg} = gt1? {expA_reg, expB_reg}: {expB_reg, expA_reg};
+    {mant1_ext, mant2_ext} = gt2? {mantB_ext, mantA_ext}: {mantA_ext, mantB_ext};
+end
+
+
+reg [4:0] mant1_norm, mant2_norm;
+reg [3:0] start_exp;
+reg [4:0] mant_sum;
+reg signed [8:0] pre_shift; 
+reg signed [8:0] shifted;
+reg [4:0] inverted; 
+reg inv = sd; // | exp_diff[2] | exp_diff[3];
+reg rs1; 
+reg [4:0] round; 
+always @(*) begin
+    exp_diff = exp1_reg - exp2_reg;
+    // (mant1_ext ^ {sd,sd,sd,sd,sd}) + 1
+    inverted = (mant1_ext ^ {sd,sd,sd,sd,sd}) + sd; 
+    pre_shift = {inverted, 4'b0};
+    shifted = pre_shift>>>exp_diff; 
+    mant1_norm = shifted[8:4];
+    mant2_norm = mant2_ext;
+
+    rs1 = result_sign & shifted[3];
+    round = {rs1, rs1, rs1, rs1, shifted[3]}  + (shifted[8]&exp_diff!=0); 
+
+
+    mant_sum = (mant2_norm + mant1_norm) + round; //round;
+end
+
+reg [4:0] shift;
+reg [4:0] exp_sum; 
+always @(*) begin
+    shift[4] = ! (mant_sum[3] | mant_sum[4]); 
+    shift[3] = shift[4]; 
+    shift[2] = shift[3]; 
+    shift[1] = (mant_sum[2] | mant_sum[1]) & shift[2];
+    shift[0] = shift[2] & (mant_sum[2] | mant_sum[0] & !mant_sum[1]) | mant_sum[4];
+end
+
+reg[3:0] final_exp;
+
+always @(*)begin
+    exp_sum = exp1_reg + shift; 
+end
+
+reg inv_sh; 
+always @(*) begin
+    inv_sh = !shift[3]; 
+    if (exp_sum[4]) 
+        final_exp = {inv_sh, inv_sh, inv_sh, inv_sh};
+    else
+        final_exp = exp_sum[3:0]; 
+end
+
+reg[2:0] shift_mant, true_shift;
+reg[2:0]  final_mant;
+reg[2:0] sum; 
+
+always @(*) begin
+    sum = (exp_sum[4] | !(|exp_sum))? exp_sum: 3'b001;
+    true_shift = ~shift + sum; 
+    shift_mant = (mant_sum << true_shift) | (true_shift!=0 && shifted[3]); 
+    if (shift[3]) 
+        final_mant = shift_mant;
+    else
+        final_mant = mant_sum >> mant_sum[4];  
+end
+
+reg[7:0] final_val;
+always @(*)
+    final_val = {result_sign, final_exp, final_mant};
+
+always @(posedge clk) begin
+    C = final_val; 
+end
+
+
+
+endmodule
